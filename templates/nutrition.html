@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block title %}Nutrition — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <!-- Header -->
+  <div class="row align-items-center mb-4">
+    <div class="col">
+      <h4 class="fw-bold mb-1"><i class="bi bi-egg-fried text-warning me-2"></i>Nutrition Assistant</h4>
+      <p class="text-muted small mb-0">AI-powered Indian-friendly meal planning, calorie analysis & hydration guide</p>
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <button class="btn btn-warning" onclick="generateMealPlan()">
+        <i class="bi bi-stars me-1"></i>AI Meal Plan
+      </button>
+      <button class="btn btn-info text-white" onclick="getHydration()">
+        <i class="bi bi-droplet me-1"></i>Hydration
+      </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Left Column -->
+    <div class="col-lg-7">
+      <!-- Calorie Analyzer -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pt-3">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-calculator text-accent me-2"></i>Calorie Analyzer</h6>
+        </div>
+        <div class="card-body">
+          <div class="input-group mb-3">
+            <input type="text" id="foodInput" class="form-control"
+                   placeholder="e.g. 2 moong dal chilla, 1 cup curd, 1 banana"
+                   onkeydown="if(event.key==='Enter') analyzeCalories()" />
+            <button class="btn btn-accent" onclick="analyzeCalories()" id="analyzeBtn">
+              <i class="bi bi-search me-1"></i>Analyze
+            </button>
+          </div>
+          <div id="calorieResult" class="d-none">
+            <div class="card bg-light border-0 rounded-3">
+              <div class="card-body" id="calorieContent"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Meal Plan Area -->
+      <div id="mealPlanArea" class="card border-0 shadow-sm mb-4 d-none">
+        <div class="card-header bg-warning-soft border-0 d-flex align-items-center justify-content-between">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-stars text-warning me-2"></i>Your AI Meal Plan</h6>
+          <button class="btn btn-sm btn-outline-secondary" onclick="copyMealPlan()">
+            <i class="bi bi-clipboard me-1"></i>Copy
+          </button>
+        </div>
+        <div class="card-body" id="mealPlanContent"></div>
+      </div>
+
+      <!-- Hydration Plan -->
+      <div id="hydrationArea" class="card border-0 shadow-sm mb-4 d-none">
+        <div class="card-header bg-info-soft border-0">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-droplet text-info me-2"></i>Hydration Plan</h6>
+        </div>
+        <div class="card-body" id="hydrationContent"></div>
+      </div>
+
+      <!-- Log Meal -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-0 pt-3">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-journal-plus text-success me-2"></i>Log a Meal</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small">Meal Type</label>
+              <select id="mealType" class="form-select form-select-sm">
+                <option value="breakfast">🌅 Breakfast</option>
+                <option value="lunch">☀️ Lunch</option>
+                <option value="dinner">🌙 Dinner</option>
+                <option value="snack">🍎 Snack</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">Food Items</label>
+              <input type="text" id="logFood" class="form-control form-control-sm" placeholder="e.g. Dal, roti, sabzi" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Calories</label>
+              <input type="number" id="logCal" class="form-control form-control-sm" placeholder="kcal" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Protein (g)</label>
+              <input type="number" id="logPro" class="form-control form-control-sm" placeholder="g" step="0.1" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Carbs (g)</label>
+              <input type="number" id="logCarb" class="form-control form-control-sm" placeholder="g" step="0.1" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Fat (g)</label>
+              <input type="number" id="logFat" class="form-control form-control-sm" placeholder="g" step="0.1" />
+            </div>
+          </div>
+          <button class="btn btn-success btn-sm mt-3" onclick="logMeal()">
+            <i class="bi bi-check2 me-1"></i>Log Meal
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Today's Summary -->
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-0 pt-3">
+          <h6 class="fw-semibold mb-0">
+            <i class="bi bi-calendar-day text-accent me-2"></i>Today's Log
+            <span class="text-muted small fw-normal">— {{ today.strftime('%b %d, %Y') }}</span>
+          </h6>
+        </div>
+        <div class="card-body" id="todayLogs">
+          {% if logs %}
+            {% for log in logs %}
+            <div class="d-flex justify-content-between align-items-start mb-3 pb-2 border-bottom">
+              <div>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">
+                  {{ log.meal_type.title() }}
+                </span>
+                <span class="small fw-medium">{{ log.food_items }}</span>
+              </div>
+              <div class="text-end">
+                {% if log.calories %}<div class="small text-accent fw-semibold">{{ log.calories }} kcal</div>{% endif %}
+                {% if log.protein_g %}<div class="small text-success">{{ log.protein_g }}g P</div>{% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-journal-x fs-2 opacity-25 mb-2 d-block"></i>
+            <p class="small">No meals logged today</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Indian Nutrition Tips -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-0 pt-3">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-lightbulb text-warning me-2"></i>Indian Nutrition Tips</h6>
+        </div>
+        <div class="card-body">
+          <div class="tips-list">
+            {% for tip in [
+              ("🌿","Soya chunks: 52g protein per 100g dry — best vegetarian source"),
+              ("🥛","Curd (dahi): probiotic + 10g protein/100g — have daily"),
+              ("🫘","Rajma + rice = complete amino acid profile"),
+              ("🌾","Millets (ragi, jowar, bajra) over white rice for lower GI"),
+              ("🟡","Haldi (turmeric) + black pepper = powerful anti-inflammatory"),
+              ("🌰","10 almonds + 2 walnuts = perfect pre-workout snack"),
+              ("🥗","Eat a rainbow — 5 different coloured vegetables daily"),
+            ] %}
+            <div class="tip-item d-flex align-items-start gap-2 mb-2">
+              <span>{{ tip[0] }}</span>
+              <span class="small text-muted">{{ tip[1] }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function analyzeCalories() {
+  const food = document.getElementById("foodInput").value.trim();
+  if (!food) { showToast("Please enter food items", "warning"); return; }
+  const btn = document.getElementById("analyzeBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+  fetch("/api/nutrition/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRF() },
+    body: JSON.stringify({ food_items: food })
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search me-1"></i>Analyze';
+    if (d.error) { showToast(d.error, "warning"); return; }
+    document.getElementById("calorieContent").innerHTML = marked.parse(d.analysis);
+    document.getElementById("calorieResult").classList.remove("d-none");
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-search me-1"></i>Analyze';
+    showToast("Error. Please try again.", "danger");
+  });
+}
+
+function generateMealPlan() {
+  const area = document.getElementById("mealPlanArea");
+  const content = document.getElementById("mealPlanContent");
+  content.innerHTML = '<div class="text-center py-4"><span class="spinner-border text-warning"></span><p class="mt-2 text-muted">Generating your personalised meal plan...</p></div>';
+  area.classList.remove("d-none");
+
+  fetch("/api/nutrition/meal-plan", {
+    method: "POST",
+    headers: { "X-CSRFToken": getCSRF() }
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.error) { showToast(d.error, "warning"); area.classList.add("d-none"); return; }
+    content.innerHTML = marked.parse(d.meal_plan);
+    area.scrollIntoView({ behavior: "smooth" });
+    showToast("Meal plan ready! 🥗", "success");
+  });
+}
+
+function getHydration() {
+  const area = document.getElementById("hydrationArea");
+  const content = document.getElementById("hydrationContent");
+  content.innerHTML = '<div class="text-center py-3"><span class="spinner-border text-info"></span></div>';
+  area.classList.remove("d-none");
+
+  fetch("/api/nutrition/hydration")
+  .then(r => r.json())
+  .then(d => {
+    content.innerHTML = marked.parse(d.tips);
+    area.scrollIntoView({ behavior: "smooth" });
+  });
+}
+
+function logMeal() {
+  const data = {
+    meal_type:  document.getElementById("mealType").value,
+    food_items: document.getElementById("logFood").value,
+    calories:   document.getElementById("logCal").value,
+    protein_g:  document.getElementById("logPro").value,
+    carbs_g:    document.getElementById("logCarb").value,
+    fat_g:      document.getElementById("logFat").value,
+  };
+  if (!data.food_items.trim()) { showToast("Enter food items", "warning"); return; }
+
+  fetch("/api/nutrition/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRF() },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(() => {
+    showToast("Meal logged! 🥗", "success");
+    setTimeout(() => location.reload(), 1200);
+  });
+}
+
+function copyMealPlan() {
+  const text = document.getElementById("mealPlanContent").innerText;
+  navigator.clipboard.writeText(text).then(() => showToast("Copied!", "success"));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <!-- Header -->
+  <div class="row align-items-center mb-4">
+    <div class="col">
+      <h4 class="fw-bold mb-1">
+        <i class="bi bi-grid-fill text-accent me-2"></i>
+        Dashboard
+      </h4>
+      <p class="text-muted small mb-0">
+        Welcome back, <strong>{{ current_user.username }}</strong>! 💪
+        {% if profile and profile.primary_goal %}
+          Your goal: <span class="text-accent">{{ profile.primary_goal.replace('_',' ').title() }}</span>
+        {% endif %}
+      </p>
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="logProgress()">
+        <i class="bi bi-plus-circle me-1"></i>Log Weight
+      </button>
+      <a href="{{ url_for('chat') }}" class="btn btn-sm btn-accent">
+        <i class="bi bi-robot me-1"></i>Ask FitBuddy
+      </a>
+    </div>
+  </div>
+
+  <!-- Profile Completeness Warning -->
+  {% if not profile or not profile.weight_kg %}
+  <div class="alert alert-warning border-0 rounded-3 d-flex align-items-center mb-4">
+    <i class="bi bi-exclamation-triangle-fill me-3 fs-5"></i>
+    <div>
+      Your fitness profile is incomplete.
+      <a href="{{ url_for('profile') }}" class="alert-link">Complete it now</a>
+      to get personalised AI recommendations.
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Stats Row -->
+  <div class="row g-3 mb-4">
+    <!-- BMI Card -->
+    <div class="col-6 col-lg-3">
+      <div class="stat-card h-100">
+        <div class="stat-card-icon bg-accent-soft text-accent"><i class="bi bi-person-bounding-box"></i></div>
+        <div class="stat-card-body">
+          <div class="stat-value">{{ profile.bmi if profile and profile.bmi else "—" }}</div>
+          <div class="stat-label">BMI</div>
+          {% if profile and profile.bmi_category %}
+          <span class="badge badge-bmi-{{ profile.bmi_category.lower() }} mt-1">{{ profile.bmi_category }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <!-- TDEE Card -->
+    <div class="col-6 col-lg-3">
+      <div class="stat-card h-100">
+        <div class="stat-card-icon bg-success-soft text-success"><i class="bi bi-fire"></i></div>
+        <div class="stat-card-body">
+          <div class="stat-value">{{ profile.tdee if profile and profile.tdee else "—" }}</div>
+          <div class="stat-label">Daily Calories</div>
+          <small class="text-muted">TDEE</small>
+        </div>
+      </div>
+    </div>
+    <!-- Calories Today -->
+    <div class="col-6 col-lg-3">
+      <div class="stat-card h-100">
+        <div class="stat-card-icon bg-warning-soft text-warning"><i class="bi bi-egg-fried"></i></div>
+        <div class="stat-card-body">
+          <div class="stat-value">{{ total_cal }}</div>
+          <div class="stat-label">Calories Today</div>
+          {% if profile and profile.tdee %}
+          <small class="text-muted">of {{ profile.tdee }} target</small>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <!-- Active Goals -->
+    <div class="col-6 col-lg-3">
+      <div class="stat-card h-100">
+        <div class="stat-card-icon bg-info-soft text-info"><i class="bi bi-trophy"></i></div>
+        <div class="stat-card-body">
+          <div class="stat-value">{{ stats.total_goals }}</div>
+          <div class="stat-label">Total Goals</div>
+          <small class="text-muted">{{ stats.completed_goals }} completed</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Weight Progress Chart -->
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between pt-3">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-graph-up-arrow text-accent me-2"></i>Weight Progress</h6>
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-secondary active" onclick="loadProgress(30, this)">30d</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="loadProgress(60, this)">60d</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="loadProgress(90, this)">90d</button>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if weight_values and weight_values != '[]' %}
+          <canvas id="weightChart" height="220"></canvas>
+          {% else %}
+          <div class="empty-chart d-flex flex-column align-items-center justify-content-center py-5 text-muted">
+            <i class="bi bi-graph-up fs-1 mb-2 opacity-25"></i>
+            <p class="mb-2">No weight data yet</p>
+            <button class="btn btn-sm btn-outline-secondary" onclick="logProgress()">
+              <i class="bi bi-plus me-1"></i>Log your first weight
+            </button>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Goals Panel -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between pt-3">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-trophy text-warning me-2"></i>Active Goals</h6>
+          <a href="{{ url_for('goals') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+        </div>
+        <div class="card-body pt-2">
+          {% if goals %}
+            {% for goal in goals[:4] %}
+            <div class="goal-item mb-3">
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <span class="small fw-medium">{{ goal.title }}</span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis small">{{ goal.progress_pct }}%</span>
+              </div>
+              <div class="progress" style="height:6px">
+                <div class="progress-bar progress-bar-gradient" style="width:{{ goal.progress_pct }}%"></div>
+              </div>
+              {% if goal.days_remaining is not none %}
+              <small class="text-muted">{{ goal.days_remaining }} days left</small>
+              {% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-trophy fs-2 opacity-25 mb-2 d-block"></i>
+            <p class="small mb-2">No goals yet</p>
+            <a href="{{ url_for('goals') }}" class="btn btn-sm btn-outline-warning">Add Goal</a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Nutrition Today -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-0 pt-3">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-egg-fried text-warning me-2"></i>Today's Nutrition</h6>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-around text-center mb-3">
+            <div>
+              <div class="h4 fw-bold text-accent">{{ total_cal }}</div>
+              <small class="text-muted">Calories</small>
+            </div>
+            <div>
+              <div class="h4 fw-bold text-success">{{ total_pro }}g</div>
+              <small class="text-muted">Protein</small>
+            </div>
+            {% if profile and profile.tdee %}
+            <div>
+              <div class="h4 fw-bold text-info">{{ profile.tdee - total_cal }}</div>
+              <small class="text-muted">Remaining</small>
+            </div>
+            {% endif %}
+          </div>
+          {% if profile and profile.tdee %}
+          <div class="progress mb-2" style="height:10px">
+            <div class="progress-bar bg-accent"
+                 style="width: {{ [(total_cal / profile.tdee * 100), 100]|min|int }}%"></div>
+          </div>
+          <small class="text-muted">{{ [(total_cal / profile.tdee * 100), 100]|min|int }}% of daily target</small>
+          {% endif %}
+          <div class="mt-3">
+            <a href="{{ url_for('nutrition') }}" class="btn btn-sm btn-outline-warning w-100">
+              <i class="bi bi-plus me-1"></i>Log Meal
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-0 pt-3">
+          <h6 class="fw-semibold mb-0"><i class="bi bi-lightning text-accent me-2"></i>Quick Actions</h6>
+        </div>
+        <div class="card-body d-flex flex-column gap-2">
+          <a href="{{ url_for('chat') }}" class="btn btn-outline-primary d-flex align-items-center gap-2">
+            <i class="bi bi-robot"></i> Chat with AI Coach
+          </a>
+          <a href="{{ url_for('workout') }}" class="btn btn-outline-success d-flex align-items-center gap-2">
+            <i class="bi bi-activity"></i> Generate Workout Plan
+          </a>
+          <a href="{{ url_for('nutrition') }}" class="btn btn-outline-warning d-flex align-items-center gap-2">
+            <i class="bi bi-egg-fried"></i> Get Meal Plan
+          </a>
+          <button class="btn btn-outline-info d-flex align-items-center gap-2" onclick="getMotivation()">
+            <i class="bi bi-stars"></i> Get Motivation
+          </button>
+          <a href="{{ url_for('profile') }}" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+            <i class="bi bi-person-gear"></i> Edit Profile
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Motivation Card -->
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm h-100 motivation-card">
+        <div class="card-body d-flex flex-column justify-content-between p-4">
+          <div>
+            <span class="badge badge-ai mb-3"><i class="bi bi-stars me-1"></i>AI Powered</span>
+            <p class="fw-medium mb-0" id="motivationText">
+              "Every rep, every step, every healthy meal brings you closer to the best version of yourself. 💪"
+            </p>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-sm btn-outline-light" onclick="getMotivation()">
+              <i class="bi bi-arrow-clockwise me-1"></i>New Quote
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log Weight Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2 text-accent"></i>Log Weight</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Weight (kg)</label>
+          <input type="number" id="logWeight" class="form-control" step="0.1"
+                 placeholder="e.g. 72.5" value="{{ profile.weight_kg if profile and profile.weight_kg else '' }}" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Body Fat % <span class="text-muted small">(optional)</span></label>
+          <input type="number" id="logFat" class="form-control" step="0.1" placeholder="e.g. 22.5" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notes <span class="text-muted small">(optional)</span></label>
+          <input type="text" id="logNotes" class="form-control" placeholder="How are you feeling today?" />
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-accent" onclick="saveProgress()">Save Log</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const WEIGHT_DATES  = {{ weight_dates|safe }};
+const WEIGHT_VALUES = {{ weight_values|safe }};
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (WEIGHT_VALUES.length > 0) {
+    renderWeightChart(WEIGHT_DATES, WEIGHT_VALUES);
+  }
+});
+
+function renderWeightChart(labels, data) {
+  const ctx = document.getElementById("weightChart");
+  if (!ctx) return;
+  if (window._weightChart) window._weightChart.destroy();
+  const isDark = document.documentElement.getAttribute("data-bs-theme") === "dark";
+  const gridColor = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)";
+  const textColor = isDark ? "#adb5bd" : "#6c757d";
+  window._weightChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Weight (kg)",
+        data: data,
+        borderColor: "#6366f1",
+        backgroundColor: "rgba(99,102,241,0.1)",
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: "#6366f1",
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1e293b",
+          titleColor: "#f8fafc",
+          bodyColor: "#cbd5e1",
+          padding: 10,
+          callbacks: { label: ctx => ` ${ctx.parsed.y} kg` }
+        }
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textColor } },
+        y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => v + " kg" } }
+      }
+    }
+  });
+}
+
+function loadProgress(days, btn) {
+  document.querySelectorAll(".btn-group .btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  fetch(`/api/progress/data?days=${days}`)
+    .then(r => r.json())
+    .then(d => renderWeightChart(d.dates, d.weight));
+}
+
+function logProgress() {
+  new bootstrap.Modal(document.getElementById("progressModal")).show();
+}
+
+function saveProgress() {
+  const body = {
+    weight_kg:    document.getElementById("logWeight").value,
+    body_fat_pct: document.getElementById("logFat").value,
+    notes:        document.getElementById("logNotes").value,
+  };
+  fetch("/api/progress/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRF() },
+    body: JSON.stringify(body)
+  }).then(r => r.json()).then(() => {
+    bootstrap.Modal.getInstance(document.getElementById("progressModal")).hide();
+    showToast("Weight logged successfully! 🎉", "success");
+    loadProgress(30, document.querySelector(".btn-group .btn.active"));
+  });
+}
+
+function getMotivation() {
+  const el = document.getElementById("motivationText");
+  el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Getting motivation...';
+  fetch("/api/motivate")
+    .then(r => r.json())
+    .then(d => { el.innerHTML = '"' + d.motivation + '"'; });
+}
+</script>
+{% endblock %}

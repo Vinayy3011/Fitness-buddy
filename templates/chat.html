@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}AI Coach — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="chat-page-wrap">
+  <div class="chat-layout">
+
+    <!-- ── Sidebar ──────────────────────────────────────────────────────── -->
+    <aside class="chat-sidebar d-none d-lg-flex flex-column">
+      <div class="sidebar-brand mb-3">
+        <div class="d-flex align-items-center gap-2 p-3 rounded-3 bg-accent-soft">
+          <div class="brand-icon brand-icon-sm"><i class="bi bi-robot"></i></div>
+          <div>
+            <div class="fw-semibold small">FitBuddy AI</div>
+            <div style="font-size:0.72rem">
+              {% if watsonx_ready %}
+              <span class="text-success">● Live — IBM Granite</span>
+              {% else %}
+              <span class="text-warning">● Demo Mode</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-muted small fw-semibold text-uppercase mb-2" style="letter-spacing:.05em">Quick Prompts</p>
+      {% set prompts = [
+        ("bi-activity",        "Generate my workout plan"),
+        ("bi-egg-fried",       "Create a 7-day meal plan"),
+        ("bi-person-bounding-box","Analyse my BMI"),
+        ("bi-droplet",         "Hydration tips for today"),
+        ("bi-stars",           "Motivate me"),
+        ("bi-heart-pulse",     "Safe exercises for beginners"),
+        ("bi-lightning-charge","HIIT workout for fat loss"),
+        ("bi-calculator",      "Calculate my daily calories"),
+      ] %}
+      <div class="sidebar-prompts flex-grow-1 overflow-auto">
+        {% for icon, text in prompts %}
+        <button class="btn btn-quick-prompt w-100 text-start mb-1" onclick="sendQuickPrompt(this)">
+          <i class="bi {{ icon }} me-2"></i>{{ text }}
+        </button>
+        {% endfor %}
+      </div>
+
+      <div class="mt-3 pt-3 border-top">
+        <button class="btn btn-sm btn-outline-danger w-100" onclick="clearChat()">
+          <i class="bi bi-trash me-2"></i>Clear Chat History
+        </button>
+      </div>
+    </aside>
+
+    <!-- ── Main Chat Column ──────────────────────────────────────────────── -->
+    <div class="chat-main d-flex flex-column">
+
+      <!-- Header (fixed) -->
+      <div class="chat-header d-flex align-items-center justify-content-between px-4 border-bottom">
+        <div class="d-flex align-items-center gap-3">
+          <div class="brand-icon brand-icon-sm"><i class="bi bi-robot"></i></div>
+          <div>
+            <div class="fw-semibold">FitBuddy AI Coach</div>
+            <div class="text-muted" style="font-size:0.78rem">
+              IBM Granite on watsonx.ai &nbsp;·&nbsp;
+              {% if watsonx_ready %}
+                <span class="text-success fw-medium">● Live</span>
+              {% else %}
+                <span class="text-warning fw-medium">● Demo</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <!-- Mobile quick prompts -->
+          <div class="dropdown d-lg-none">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+              <i class="bi bi-lightning me-1"></i>Prompts
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow">
+              {% for icon, text in [
+                ("bi-activity","Generate my workout plan"),
+                ("bi-egg-fried","Create a 7-day meal plan"),
+                ("bi-person-bounding-box","Analyse my BMI"),
+                ("bi-droplet","Hydration tips"),
+                ("bi-stars","Motivate me"),
+              ] %}
+              <li>
+                <a class="dropdown-item small" href="#" onclick="sendQuickPromptText('{{ text }}'); return false;">
+                  <i class="bi {{ icon }} me-2"></i>{{ text }}
+                </a>
+              </li>
+              {% endfor %}
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item small text-danger" href="#" onclick="clearChat(); return false;">
+                  <i class="bi bi-trash me-2"></i>Clear history
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Messages area (scrollable) ──────────────────────────────────── -->
+      <div class="chat-messages-wrap">
+        <div class="chat-messages" id="chatMessages">
+
+          <!-- Welcome bubble (only on empty chat) -->
+          {% if not messages %}
+          <div class="message-wrapper bot mb-3">
+            <div class="message-avatar"><i class="bi bi-robot"></i></div>
+            <div class="message-bubble bot">
+              <p class="mb-2">👋 Hi <strong>{{ current_user.username }}</strong>! I'm <strong>FitBuddy</strong>, your AI fitness coach.</p>
+              <p class="mb-2">I'm powered by <strong>IBM Granite</strong> and can help you with:</p>
+              <ul class="mb-2 ps-3">
+                <li>💪 Personalised workout plans</li>
+                <li>🥗 Indian diet &amp; nutrition guidance</li>
+                <li>📊 BMI and calorie calculations</li>
+                <li>🎯 Goal setting &amp; progress tracking</li>
+                <li>💧 Hydration and recovery tips</li>
+              </ul>
+              <p class="mb-0">Pick a quick prompt on the left, or type below to get started!</p>
+            </div>
+          </div>
+          {% endif %}
+
+          {% for msg in messages %}
+          <div class="message-wrapper {{ msg.role }} mb-3">
+            {% if msg.role == "assistant" %}
+            <div class="message-avatar"><i class="bi bi-robot"></i></div>
+            <div class="message-bubble bot" data-markdown="{{ msg.content | e }}"></div>
+            {% else %}
+            <div class="message-bubble user">{{ msg.content }}</div>
+            <div class="message-avatar user"><i class="bi bi-person"></i></div>
+            {% endif %}
+          </div>
+          {% endfor %}
+
+          <!-- Typing indicator -->
+          <div class="message-wrapper bot mb-3 d-none" id="typingIndicator">
+            <div class="message-avatar"><i class="bi bi-robot"></i></div>
+            <div class="message-bubble bot">
+              <div class="typing-dots"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scroll-to-bottom FAB (outside the scrolling div, inside the wrapper) -->
+        <button class="btn-scroll-bottom" id="scrollBtn" onclick="scrollToBottom()" title="Jump to latest">
+          <i class="bi bi-chevron-double-down"></i>
+        </button>
+      </div>
+
+      <!-- ── Suggested chips (always visible above input) ─────────────────── -->
+      <div class="chat-suggestions border-top px-3 pt-2 pb-1">
+        <div class="suggestions-scroll">
+          {% set chips = [
+            "Generate my workout plan",
+            "Create a 7-day meal plan",
+            "Analyse my BMI",
+            "Hydration tips for today",
+            "Motivate me",
+            "Safe exercises for beginners",
+            "HIIT workout for fat loss",
+            "Calculate my daily calories",
+            "Best protein sources for vegetarians",
+            "Post-workout recovery tips",
+          ] %}
+          {% for chip in chips %}
+          <button class="chip" onclick="sendQuickPromptText('{{ chip }}')">{{ chip }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- ── Input bar (always visible at bottom) ─────────────────────────── -->
+      <div class="chat-input-area px-3 py-3">
+        <div class="d-flex align-items-end gap-2">
+          <div class="flex-grow-1">
+            <textarea id="chatInput" class="form-control chat-textarea" rows="1"
+                      placeholder="Ask FitBuddy anything about fitness, nutrition, workouts…"
+                      onkeydown="handleChatKey(event)"
+                      oninput="autoResize(this)"></textarea>
+          </div>
+          <button class="btn btn-accent btn-send" id="sendBtn" onclick="sendMessage()" title="Send (Enter)">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-1">
+          <small class="text-muted"><kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> for new line</small>
+          <small class="text-muted" id="charCount">0 / 500</small>
+        </div>
+      </div>
+
+    </div><!-- /chat-main -->
+  </div><!-- /chat-layout -->
+</div><!-- /chat-page-wrap -->
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const chatBox   = document.getElementById("chatMessages");
+const scrollBtn = document.getElementById("scrollBtn");
+
+// ── Scroll helpers ──────────────────────────────────────────────────────────
+function scrollToBottom() {
+  requestAnimationFrame(() => { chatBox.scrollTop = chatBox.scrollHeight; });
+}
+function isNearBottom() {
+  return chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+}
+
+chatBox.addEventListener("scroll", () => {
+  scrollBtn.classList.toggle("visible", !isNearBottom());
+}, { passive: true });
+
+// ── Page load: render existing history, then scroll ─────────────────────────
+document.querySelectorAll(".message-bubble.bot[data-markdown]").forEach(el => {
+  el.innerHTML = marked.parse(el.dataset.markdown);
+  el.removeAttribute("data-markdown");
+});
+scrollToBottom();
+
+// ── Input helpers ───────────────────────────────────────────────────────────
+let isSending = false;
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  document.getElementById("charCount").textContent = el.value.length + " / 500";
+}
+
+function handleChatKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function sendQuickPrompt(el) {
+  sendQuickPromptText(el.textContent.trim());
+}
+function sendQuickPromptText(text) {
+  const input = document.getElementById("chatInput");
+  input.value = text;
+  autoResize(input);
+  sendMessage();
+}
+
+// ── Send + stream ────────────────────────────────────────────────────────────
+function sendMessage() {
+  if (isSending) return;
+  const input   = document.getElementById("chatInput");
+  const message = input.value.trim();
+  if (!message) return;
+  if (message.length > 500) { showToast("Message too long (max 500 chars)", "warning"); return; }
+
+  appendUserMsg(message);
+  input.value = "";
+  input.style.height = "auto";
+  document.getElementById("charCount").textContent = "0 / 500";
+
+  const typingEl = document.getElementById("typingIndicator");
+  typingEl.classList.remove("d-none");
+  scrollToBottom();
+
+  isSending = true;
+  document.getElementById("sendBtn").disabled = true;
+
+  // Pre-create bot bubble (empty, streams into it)
+  const botWrapper = document.createElement("div");
+  botWrapper.className = "message-wrapper bot mb-3";
+  botWrapper.innerHTML = `
+    <div class="message-avatar"><i class="bi bi-robot"></i></div>
+    <div class="message-bubble bot" id="streamBubble"></div>`;
+
+  let rawText = "";
+
+  fetch("/api/chat/stream", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRF() },
+    body:    JSON.stringify({ message }),
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    typingEl.classList.add("d-none");
+    chatBox.insertBefore(botWrapper, typingEl);
+    const bubble  = document.getElementById("streamBubble");
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let   buf     = "";
+
+    function pump() {
+      return reader.read().then(({ done, value }) => {
+        if (done) { finalise(bubble, rawText); return; }
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          try {
+            const p = JSON.parse(line.slice(5).trim());
+            if (p.token) {
+              rawText += p.token;
+              bubble.innerHTML = marked.parse(rawText);
+              if (isNearBottom()) scrollToBottom();
+            }
+          } catch (_) {}
+        }
+        return pump();
+      });
+    }
+    return pump();
+  })
+  .catch(() => {
+    typingEl.classList.add("d-none");
+    if (!rawText) appendBotMsg("⚠️ Connection error. Please try again.");
+  })
+  .finally(() => {
+    isSending = false;
+    document.getElementById("sendBtn").disabled = false;
+    document.getElementById("chatInput").focus();
+  });
+}
+
+function finalise(bubble, text) {
+  bubble.innerHTML = text ? marked.parse(text) : "⚠️ No response received.";
+  bubble.id = "";
+  scrollToBottom();
+}
+
+function appendUserMsg(content) {
+  const w = document.createElement("div");
+  w.className = "message-wrapper user mb-3";
+  w.innerHTML = `
+    <div class="message-bubble user">${escapeHtml(content)}</div>
+    <div class="message-avatar user"><i class="bi bi-person"></i></div>`;
+  chatBox.insertBefore(w, document.getElementById("typingIndicator"));
+  scrollToBottom();
+}
+
+function appendBotMsg(content) {
+  const w = document.createElement("div");
+  w.className = "message-wrapper bot mb-3";
+  w.innerHTML = `
+    <div class="message-avatar"><i class="bi bi-robot"></i></div>
+    <div class="message-bubble bot">${escapeHtml(content)}</div>`;
+  chatBox.insertBefore(w, document.getElementById("typingIndicator"));
+  scrollToBottom();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+            .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+
+function clearChat() {
+  if (!confirm("Clear all chat history?")) return;
+  fetch("/api/chat/clear", {
+    method:  "POST",
+    headers: { "X-CSRFToken": getCSRF() },
+  }).then(() => location.reload());
+}
+</script>
+{% endblock %}

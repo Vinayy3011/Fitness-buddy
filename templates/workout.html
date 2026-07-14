@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Workout Planner — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <!-- Header -->
+  <div class="row align-items-center mb-4">
+    <div class="col">
+      <h4 class="fw-bold mb-1"><i class="bi bi-activity text-success me-2"></i>Workout Planner</h4>
+      <p class="text-muted small mb-0">AI-generated workout plans tailored to your fitness level and goals</p>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-success" id="generateBtn" onclick="generateWorkout()">
+        <i class="bi bi-stars me-2"></i>Generate AI Plan
+      </button>
+    </div>
+  </div>
+
+  {% if not profile or not profile.fitness_level %}
+  <div class="alert alert-warning border-0 rounded-3 mb-4">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    Complete your <a href="{{ url_for('profile') }}" class="alert-link">fitness profile</a> to get personalised workout plans.
+  </div>
+  {% endif %}
+
+  <!-- Profile Summary -->
+  {% if profile and profile.fitness_level %}
+  <div class="row g-3 mb-4">
+    {% set level_color = {"beginner": "success", "intermediate": "warning", "advanced": "danger"} %}
+    <div class="col-6 col-md-3">
+      <div class="stat-mini-card text-center p-3">
+        <div class="text-success fw-bold">{{ profile.fitness_level.title() }}</div>
+        <small class="text-muted">Fitness Level</small>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-mini-card text-center p-3">
+        <div class="text-accent fw-bold">{{ profile.primary_goal.replace('_',' ').title() if profile.primary_goal else '—' }}</div>
+        <small class="text-muted">Goal</small>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-mini-card text-center p-3">
+        <div class="text-warning fw-bold">{{ {"beginner":3,"intermediate":4,"advanced":5}.get(profile.fitness_level, 3) }}x/week</div>
+        <small class="text-muted">Recommended</small>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-mini-card text-center p-3">
+        <div class="text-info fw-bold">{{ profile.activity_level.replace('_',' ').title() if profile.activity_level else '—' }}</div>
+        <small class="text-muted">Activity Level</small>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- AI Generated Plan Area -->
+  <div id="aiPlanArea" class="d-none mb-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-success-soft border-0 d-flex align-items-center justify-content-between">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-stars text-success me-2"></i>Your AI Workout Plan</h6>
+        <button class="btn btn-sm btn-outline-secondary" onclick="copyPlan()">
+          <i class="bi bi-clipboard me-1"></i>Copy
+        </button>
+      </div>
+      <div class="card-body" id="aiPlanContent"></div>
+    </div>
+  </div>
+
+  <!-- Saved Plans -->
+  <h6 class="fw-semibold mb-3">
+    <i class="bi bi-calendar3 me-2"></i>Saved Plans
+    <span class="badge bg-secondary ms-1">{{ plans|length }}</span>
+  </h6>
+
+  {% if plans %}
+  <div class="row g-3">
+    {% for plan in plans %}
+    <div class="col-lg-6" id="plan-{{ plan.id }}">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-0 d-flex align-items-center justify-content-between pt-3">
+          <div>
+            <h6 class="fw-semibold mb-0">{{ plan.title }}</h6>
+            <small class="text-muted">{{ plan.created_at.strftime('%b %d, %Y') }} • {{ plan.days_per_week }} days/week</small>
+          </div>
+          <div class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-primary" onclick="togglePlan({{ plan.id }})">
+              <i class="bi bi-eye"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deletePlan({{ plan.id }})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body pt-1 d-none" id="planBody-{{ plan.id }}">
+          <div class="plan-content" data-markdown="{{ plan.content }}"></div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-activity fs-1 opacity-25 mb-3 d-block"></i>
+    <h5>No workout plans yet</h5>
+    <p class="small">Click "Generate AI Plan" to create your personalised workout plan</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Render plan markdown on load
+document.querySelectorAll(".plan-content[data-markdown]").forEach(el => {
+  el.innerHTML = marked.parse(el.dataset.markdown);
+  el.removeAttribute("data-markdown");
+});
+
+function generateWorkout() {
+  const btn = document.getElementById("generateBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+  const area = document.getElementById("aiPlanArea");
+  area.classList.add("d-none");
+
+  fetch("/api/workout/generate", {
+    method: "POST",
+    headers: { "X-CSRFToken": getCSRF() }
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-stars me-2"></i>Generate AI Plan';
+    if (d.error) {
+      showToast(d.error, "warning");
+      return;
+    }
+    document.getElementById("aiPlanContent").innerHTML = marked.parse(d.plan);
+    area.classList.remove("d-none");
+    area.scrollIntoView({ behavior: "smooth", block: "start" });
+    showToast("Workout plan generated! 💪", "success");
+    setTimeout(() => location.reload(), 2000);
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-stars me-2"></i>Generate AI Plan';
+    showToast("Error generating plan. Please try again.", "danger");
+  });
+}
+
+function togglePlan(id) {
+  const body = document.getElementById(`planBody-${id}`);
+  body.classList.toggle("d-none");
+}
+
+function deletePlan(id) {
+  if (!confirm("Delete this workout plan?")) return;
+  fetch(`/api/workout/${id}/delete`, {
+    method: "POST",
+    headers: { "X-CSRFToken": getCSRF() }
+  }).then(() => {
+    document.getElementById(`plan-${id}`).remove();
+    showToast("Plan deleted.", "info");
+  });
+}
+
+function copyPlan() {
+  const text = document.getElementById("aiPlanContent").innerText;
+  navigator.clipboard.writeText(text).then(() => showToast("Copied to clipboard!", "success"));
+}
+</script>
+{% endblock %}

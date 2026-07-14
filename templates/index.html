@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Welcome — {{ app_name }}{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section d-flex align-items-center min-vh-100">
+  <div class="container py-5">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-6" data-animate="fade-up">
+        <span class="badge badge-ai mb-3 px-3 py-2 fs-6">
+          <i class="bi bi-stars me-1"></i> IBM watsonx.ai Powered
+        </span>
+        <h1 class="hero-title display-4 fw-black mb-4">
+          Your Personal<br>
+          <span class="text-gradient">AI Fitness Coach</span>
+        </h1>
+        <p class="hero-subtitle lead text-muted mb-4">
+          Meet FitBuddy — the intelligent fitness companion powered by
+          <strong>IBM Granite</strong>. Get personalised workout plans, nutrition
+          guidance, BMI analysis, and real-time coaching tailored to your Indian
+          lifestyle.
+        </p>
+        <div class="d-flex flex-wrap gap-3 mb-5">
+          <a href="{{ url_for('register') }}" class="btn btn-accent btn-lg px-5 shadow-sm">
+            <i class="bi bi-rocket-takeoff me-2"></i>Start Free
+          </a>
+          <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Login
+          </a>
+        </div>
+        <!-- Feature pills -->
+        <div class="d-flex flex-wrap gap-2">
+          {% for feat in ["AI Chat Coach","Workout Planner","Nutrition AI","BMI Analysis","Goal Tracker","Indian Diet"] %}
+          <span class="badge badge-feature">✓ {{ feat }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="col-lg-6 text-center" data-animate="fade-left">
+        <div class="hero-card mx-auto">
+          <div class="hero-card-inner p-4">
+            <div class="chat-demo mb-4">
+              <div class="chat-bubble bot mb-3">
+                <div class="bubble-avatar"><i class="bi bi-robot"></i></div>
+                <div class="bubble-text">
+                  👋 Hi! I'm FitBuddy. Tell me your goals and I'll create your personalised fitness plan!
+                </div>
+              </div>
+              <div class="chat-bubble user mb-3">
+                <div class="bubble-text">I want to lose 10kg in 3 months, vegetarian diet</div>
+                <div class="bubble-avatar user"><i class="bi bi-person"></i></div>
+              </div>
+              <div class="chat-bubble bot">
+                <div class="bubble-avatar"><i class="bi bi-robot"></i></div>
+                <div class="bubble-text">
+                  💪 Great goal! Based on your profile, I recommend a 500-cal deficit with HIIT 3x/week + high-protein Indian meals...
+                </div>
+              </div>
+            </div>
+            <div class="row g-3 text-center">
+              <div class="col-4">
+                <div class="stat-mini"><div class="stat-num text-accent">5K+</div><div class="stat-lbl">Users</div></div>
+              </div>
+              <div class="col-4">
+                <div class="stat-mini"><div class="stat-num text-success">IBM</div><div class="stat-lbl">Granite AI</div></div>
+              </div>
+              <div class="col-4">
+                <div class="stat-mini"><div class="stat-num text-warning">100%</div><div class="stat-lbl">Free</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section py-5">
+  <div class="container py-4">
+    <div class="text-center mb-5" data-animate="fade-up">
+      <h2 class="fw-bold">Everything You Need to Get Fit</h2>
+      <p class="text-muted">AI-powered tools built for the Indian fitness lifestyle</p>
+    </div>
+    <div class="row g-4">
+      {% set features = [
+        ("bi-robot","AI Fitness Coach","Chat with FitBuddy 24/7. Get personalised advice, answer fitness questions, and stay motivated with IBM Granite AI.","text-accent"),
+        ("bi-activity","Smart Workout Plans","Auto-generated workout plans tailored to your level, goal, available time, and home/gym setup.","text-success"),
+        ("bi-egg-fried","Nutrition Assistant","Indian-friendly meal plans, calorie analysis, macro tracking, and healthy recipe suggestions.","text-warning"),
+        ("bi-graph-up","Progress Dashboard","Visual charts, BMI tracking, weight history, and goal progress — all in one beautiful dashboard.","text-info"),
+        ("bi-trophy","Goal Tracking","Set SMART fitness goals with deadlines, track progress percentage, and get reminders.","text-danger"),
+        ("bi-droplet","Hydration Guide","Personalised daily water intake calculations with Indian electrolyte tips and seasonal adjustments.","text-primary")
+      ] %}
+      {% for icon, title, desc, color in features %}
+      <div class="col-md-6 col-lg-4" data-animate="fade-up">
+        <div class="feature-card h-100">
+          <div class="feature-icon {{ color }} mb-3">
+            <i class="bi {{ icon }}"></i>
+          </div>
+          <h5 class="fw-semibold mb-2">{{ title }}</h5>
+          <p class="text-muted small mb-0">{{ desc }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section py-5">
+  <div class="container text-center py-4">
+    <div class="cta-card mx-auto" style="max-width:640px" data-animate="fade-up">
+      <h2 class="fw-black mb-3">Ready to Transform Your Fitness?</h2>
+      <p class="text-muted mb-4">Join thousands of users who train smarter with AI guidance.</p>
+      <a href="{{ url_for('register') }}" class="btn btn-accent btn-lg px-5 shadow">
+        <i class="bi bi-lightning-charge me-2"></i>Create Free Account
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}

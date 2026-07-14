@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% block title %}Goals — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <!-- Header -->
+  <div class="row align-items-center mb-4">
+    <div class="col">
+      <h4 class="fw-bold mb-1"><i class="bi bi-trophy text-warning me-2"></i>Goal Tracker</h4>
+      <p class="text-muted small mb-0">Set SMART fitness goals and track your progress</p>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#addGoalModal">
+        <i class="bi bi-plus-circle me-2"></i>Add Goal
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Row -->
+  {% set total     = goals|length %}
+  {% set completed = goals|selectattr('is_completed')|list|length %}
+  {% set active    = total - completed %}
+  <div class="row g-3 mb-4">
+    <div class="col-4">
+      <div class="stat-mini-card text-center p-3">
+        <div class="h3 fw-bold text-accent">{{ total }}</div>
+        <small class="text-muted">Total Goals</small>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="stat-mini-card text-center p-3">
+        <div class="h3 fw-bold text-success">{{ completed }}</div>
+        <small class="text-muted">Completed</small>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="stat-mini-card text-center p-3">
+        <div class="h3 fw-bold text-warning">{{ active }}</div>
+        <small class="text-muted">In Progress</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goals List -->
+  {% if goals %}
+  <div class="row g-3" id="goalsList">
+    {% for goal in goals %}
+    <div class="col-md-6 col-lg-4" id="goal-{{ goal.id }}">
+      <div class="card border-0 shadow-sm h-100 {% if goal.is_completed %}goal-completed{% endif %}">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-start justify-content-between mb-3">
+            <div class="flex-grow-1 me-3">
+              <span class="badge goal-type-badge-{{ goal.goal_type }} mb-2">
+                {{ goal.goal_type.title() }}
+              </span>
+              <h6 class="fw-semibold mb-0 {% if goal.is_completed %}text-muted text-decoration-line-through{% endif %}">
+                {{ goal.title }}
+              </h6>
+            </div>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-icon" data-bs-toggle="dropdown">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                {% if not goal.is_completed %}
+                <li><a class="dropdown-item small" href="#" onclick="updateGoalProgress({{ goal.id }}); return false;">
+                  <i class="bi bi-pencil me-2"></i>Update Progress</a></li>
+                <li><a class="dropdown-item small text-success" href="#" onclick="completeGoal({{ goal.id }}); return false;">
+                  <i class="bi bi-check2-circle me-2"></i>Mark Complete</a></li>
+                <li><hr class="dropdown-divider"></li>
+                {% endif %}
+                <li><a class="dropdown-item small text-danger" href="#" onclick="deleteGoal({{ goal.id }}); return false;">
+                  <i class="bi bi-trash me-2"></i>Delete</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          {% if goal.target_value %}
+          <div class="mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <small class="text-muted">Progress</small>
+              <small class="fw-semibold" id="pct-{{ goal.id }}">{{ goal.progress_pct }}%</small>
+            </div>
+            <div class="progress" style="height:8px">
+              <div class="progress-bar progress-bar-gradient {% if goal.is_completed %}bg-success{% endif %}"
+                   id="bar-{{ goal.id }}"
+                   style="width:{{ goal.progress_pct }}%"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-1">
+              <small class="text-muted" id="cur-{{ goal.id }}">{{ goal.current_value }} {{ goal.unit }}</small>
+              <small class="text-muted">Target: {{ goal.target_value }} {{ goal.unit }}</small>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Deadline -->
+          <div class="d-flex align-items-center justify-content-between mt-3">
+            {% if goal.deadline %}
+            <small class="text-muted">
+              <i class="bi bi-calendar3 me-1"></i>
+              {% if goal.days_remaining is not none %}
+                {% if goal.days_remaining > 0 %}
+                  {{ goal.days_remaining }} days left
+                {% elif goal.days_remaining == 0 %}
+                  <span class="text-warning fw-semibold">Due today!</span>
+                {% else %}
+                  <span class="text-danger fw-semibold">{{ goal.days_remaining|abs }} days overdue</span>
+                {% endif %}
+              {% endif %}
+            </small>
+            {% else %}
+            <small class="text-muted">No deadline</small>
+            {% endif %}
+            {% if goal.is_completed %}
+            <span class="badge bg-success-subtle text-success-emphasis">
+              <i class="bi bi-check2 me-1"></i>Complete
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-trophy fs-1 opacity-25 mb-3 d-block"></i>
+    <h5>No goals yet</h5>
+    <p class="small mb-4">Setting clear goals is the first step to fitness success!</p>
+    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#addGoalModal">
+      <i class="bi bi-plus-circle me-2"></i>Set Your First Goal
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add Goal Modal -->
+<div class="modal fade" id="addGoalModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-warning me-2"></i>Add New Goal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-medium">Goal Title</label>
+          <input type="text" id="goalTitle" class="form-control"
+                 placeholder="e.g. Lose 5kg by March" />
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label fw-medium">Goal Type</label>
+            <select id="goalType" class="form-select">
+              <option value="weight">⚖️ Weight</option>
+              <option value="strength">💪 Strength</option>
+              <option value="cardio">🏃 Cardio</option>
+              <option value="habit">📅 Habit</option>
+              <option value="nutrition">🥗 Nutrition</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-medium">Unit</label>
+            <input type="text" id="goalUnit" class="form-control" placeholder="kg, reps, days..." />
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label fw-medium">Current Value</label>
+            <input type="number" id="goalCurrent" class="form-control" placeholder="0" step="0.1" />
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-medium">Target Value</label>
+            <input type="number" id="goalTarget" class="form-control" placeholder="e.g. 65" step="0.1" />
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-medium">Deadline <span class="text-muted small">(optional)</span></label>
+          <input type="date" id="goalDeadline" class="form-control" />
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-warning" onclick="addGoal()">
+          <i class="bi bi-check2 me-1"></i>Add Goal
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Update Progress Modal -->
+<div class="modal fade" id="updateProgressModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Update Progress</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="updateGoalId" />
+        <label class="form-label">Current Value</label>
+        <input type="number" id="updateCurrentValue" class="form-control" step="0.1" />
+      </div>
+      <div class="modal-footer border-0">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-accent btn-sm" onclick="saveProgress()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function addGoal() {
+  const data = {
+    title:         document.getElementById("goalTitle").value.trim(),
+    goal_type:     document.getElementById("goalType").value,
+    unit:          document.getElementById("goalUnit").value,
+    current_value: document.getElementById("goalCurrent").value || 0,
+    target_value:  document.getElementById("goalTarget").value || null,
+    deadline:      document.getElementById("goalDeadline").value || null,
+  };
+  if (!data.title) { showToast("Please enter a goal title", "warning"); return; }
+
+  fetch("/api/goals/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRF() },
+    body: JSON.stringify(data)
+  }).then(r => r.json()).then(d => {
+    bootstrap.Modal.getInstance(document.getElementById("addGoalModal")).hide();
+    showToast("Goal added! 🎯", "success");
+    setTimeout(() => location.reload(), 1000);
+  });
+}
+
+function updateGoalProgress(id) {
+  document.getElementById("updateGoalId").value = id;
+  const cur = document.getElementById(`cur-${id}`);
+  if (cur) {
+    document.getElementById("updateCurrentValue").value = parseFloat(cur.textContent) || 0;
+  }
+  new bootstrap.Modal(document.getElementById("updateProgressModal")).show();
+}
+
+function saveProgress() {
+  const id  = document.getElementById("updateGoalId").value;
+  const val = document.getElementById("updateCurrentValue").value;
+  fetch(`/api/goals/${id}/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRF() },
+    body: JSON.stringify({ current_value: val })
+  }).then(r => r.json()).then(d => {
+    bootstrap.Modal.getInstance(document.getElementById("updateProgressModal")).hide();
+    document.getElementById(`bar-${id}`).style.width = d.progress + "%";
+    document.getElementById(`pct-${id}`).textContent = d.progress + "%";
+    if (d.progress >= 100) {
+      document.getElementById(`bar-${id}`).classList.add("bg-success");
+    }
+    showToast("Progress updated! 🎉", "success");
+  });
+}
+
+function completeGoal(id) {
+  fetch(`/api/goals/${id}/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRF() },
+    body: JSON.stringify({ is_completed: true, current_value: 100 })
+  }).then(() => {
+    showToast("Goal completed! 🏆 Congratulations!", "success");
+    setTimeout(() => location.reload(), 1200);
+  });
+}
+
+function deleteGoal(id) {
+  if (!confirm("Delete this goal?")) return;
+  fetch(`/api/goals/${id}/delete`, {
+    method: "POST",
+    headers: { "X-CSRFToken": getCSRF() }
+  }).then(() => {
+    document.getElementById(`goal-${id}`).remove();
+    showToast("Goal deleted.", "info");
+  });
+}
+</script>
+{% endblock %}
